@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Landmark Creator</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #map {
+            height: 500px;
+            width: 80%;
+            margin: auto;
+            border: 2px solid black;
+            border-radius: 8px;
+        }
+        #landmarkList, #visitingPlanList {
+            margin-top: 10px;
+            text-align: left;
+            width: 80%;
+            margin: auto;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #searchInput {
+            padding: 10px;
+            width: 300px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border: 1px solid gray;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Click on the Map to Add Landmarks</h2>
+
+    <input type="text" id="searchInput" placeholder="Search landmarks..." onkeyup="searchLandmarks()">
+
+    <div id="map"></div>
+    
+    <h3>Selected Landmarks</h3>
+    <ul id="landmarkList"></ul>
+    
+    <button onclick="addLandmarks()">Add Notes</button>
+    <button onclick="getVisitedLandmarks()">Visited Landmarks</button>
+    <button onclick="startVisitingMode()">Create Visiting Plans</button>
+
+    <h3>Visiting Plans Created:</h3>
+    <ul id="visitingPlanList"></ul>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([20, 0], 2);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        let landmarks = [];
+        let markers = [];
+        let visitingMode = false;
+
+        map.on('click', function(e) {
+            if (!visitingMode) {
+                var lat = e.latlng.lat.toFixed(6);
+                var lng = e.latlng.lng.toFixed(6);
+
+                var name = prompt("Enter Landmark Name:");
+                if (!name) name = "Unnamed Landmark";
+
+                var description = prompt("Enter Description:");
+                if (!description) description = "No description";
+
+                var category = prompt("Enter Category (e.g., historical, natural, cultural):");
+                if (!category) category = "Unknown";
+
+                var marker = L.marker([lat, lng]).addTo(map)
+                    .bindPopup(`Lat: ${lat}, Lng: ${lng}`);
+
+                marker.landmarkData = {
+                    id: Date.now() + Math.floor(Math.random() * 1000),
+                    name: name,
+                    description: description,
+                    category: category,
+                    latitude: lat,
+                    longitude: lng
+                };
+
+                markers.push(marker);
+                landmarks.push(marker.landmarkData);
+                updateLandmarkList();
+            }
+        });
+
+        function updateLandmarkList() {
+            let list = document.getElementById('landmarkList');
+            list.innerHTML = "";
+            landmarks.forEach((point, index) => {
+                let li = document.createElement('li');
+                li.textContent = `Landmark ${index + 1}: ${point.name} (Lat ${point.latitude}, Lng ${point.longitude})`;
+                list.appendChild(li);
+            });
+        }
+
+        function addLandmarks() {
+            if (landmarks.length === 0) {
+                alert("No landmarks selected!");
+                return;
+            }
+
+            landmarks.forEach(async (point) => {
+                const response = await fetch('http://localhost:5000/api/landmarks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: point.id,
+                        name: point.name,
+                        latitude: point.latitude,
+                        longitude: point.longitude,
+                        description: point.description,
+                        category: point.category
+                    })
+                });
+                const data = await response.json();
+                console.log("Added:", data);
+            });
+
+            alert("Landmarks added!");
+        }
+
+        function getVisitedLandmarks() {
+    fetch('http://localhost:5000/api/visited')
+        .then(response => response.json())
+        .then(data => {
+            console.log("Visited Landmarks:", data);
+
+            let visitingList = document.getElementById('visitingPlanList');
+            visitingList.innerHTML = ""; // 
+
+            data.forEach((visit) => {
+                let li = document.createElement('li');
+                li.textContent = `Landmark ID: ${visit.landmark_id} | Date: ${visit.visited_date} | Visitor: ${visit.visitor_name} | Note: ${visit.visiting_note}`;
+                visitingList.appendChild(li);
+            });
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+        function startVisitingMode() {
+    visitingMode = !visitingMode; // Her butona tıklayınca visitingMode tersine döner
+
+    if (visitingMode) {
+        alert("Visiting Mode Activated: Click on existing landmarks to add visiting notes!");
+
+        markers.forEach(marker => {
+            marker.on('click', async function onMarkerClick() {
+                if (visitingMode) {
+                    const visitingNote = prompt(`Enter a visiting note for ${marker.landmarkData.name}:`);
+                    if (visitingNote !== null) {
+                        const response = await fetch('http://localhost:5000/api/visited', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                landmark_id: marker.landmarkData.id,
+                                visited_date: new Date().toISOString().split('T')[0],
+                                visitor_name: "Mert",
+                                visiting_note: visitingNote || "No note provided"
+                            })
+                        });
+                        const data = await response.json();
+                        console.log("Visiting Plan Created:", data);
+
+                        let visitingList = document.getElementById('visitingPlanList');
+                        let li = document.createElement('li');
+                        li.textContent = `Landmark: ${data.landmark_id} | Date: ${data.visited_date} | Visitor: ${data.visitor_name} | Note: ${data.visiting_note}`;
+                        visitingList.appendChild(li);
+                    }
+                }
+            });
+        });
+
+    } else {
+        alert("Visiting Mode Deactivated: Now you can add new landmarks!");
+    }
+}
+
+
+        function searchLandmarks() {
+            let searchValue = document.getElementById('searchInput').value.toLowerCase();
+            fetch('http://localhost:5000/api/landmarks')
+                .then(response => response.json())
+                .then(data => {
+                    let list = document.getElementById('landmarkList');
+                    list.innerHTML = "";
+                    data.filter(l => 
+                        (l.name && l.name.toLowerCase().includes(searchValue)) ||
+                        (l.description && l.description.toLowerCase().includes(searchValue)) ||
+                        (l.category && l.category.toLowerCase().includes(searchValue))
+                    ).forEach((point) => {
+                        let li = document.createElement('li');
+                        li.textContent = `Landmark: ${point.name} (${point.location.latitude}, ${point.location.longitude})`;
+                        list.appendChild(li);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        }
+    </script>
+
+</body>
+</html>

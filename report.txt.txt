@@ -1,0 +1,21 @@
+Project Title: Landmark Creator - Dynamic Web Programming Midterm Project
+
+Student Name: Mert Kalaycı
+
+Description:
+This project allows users to add landmarks on a map, categorize them, and create visiting plans by adding visiting notes. Users interact with a dynamic frontend connected to a backend server via Fetch API.
+
+Backend:
+- Built with Node.js and Express.
+- Provides REST API endpoints for landmarks and visited landmarks.
+- Stores data in memory.
+
+Frontend:
+- Built with HTML, CSS, and JavaScript.
+- Uses Leaflet.js for the map interface.
+- Allows adding landmarks, searching/filtering them, and marking them as visited.
+
+Deployment:
+- Backend server runs locally at http://localhost:5000
+- Frontend is accessed by opening `index.html` directly.
+
